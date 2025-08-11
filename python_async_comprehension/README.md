@@ -31,4 +31,4 @@ python3 <filename>.py
 ---
 
 ## ✍️ Author
-[Meshari - M0simi](https://github.com/M0simi)
+Riyadh Alhamad
