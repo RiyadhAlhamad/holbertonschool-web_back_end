@@ -1,17 +1,11 @@
 #!/usr/bin/env python3
 """
-Deletion-resilient hypermedia pagination.
-
-Goal:
-- Return a stable page even if some rows were deleted between requests.
-- Collect the first `page_size` existing items starting from logical `index`,
-  skipping missing keys in the indexed dataset.
-- Return `next_index` as the logical position to continue from on the next call.
+Deletion-resilient hypermedia pagination
 """
 
 import csv
 import math
-from typing import List
+from typing import List, Dict
 
 
 class Server:
@@ -31,41 +25,44 @@ class Server:
                 reader = csv.reader(f)
                 dataset = [row for row in reader]
             self.__dataset = dataset[1:]
+
         return self.__dataset
 
-    def indexed_dataset(self) -> dict:
+    def indexed_dataset(self) -> Dict[int, List]:
         """Dataset indexed by sorting position, starting at 0
         """
         if self.__indexed_dataset is None:
             dataset = self.dataset()
-            truncated_dataset = dataset[:1000]  # kept as in starter; not used intentionally
-            self.__indexed_dataset = {i: dataset[i] for i in range(len(dataset))}
+            truncated_dataset = dataset[:1000]
+            self.__indexed_dataset = {
+                i: dataset[i] for i in range(len(dataset))
+            }
         return self.__indexed_dataset
 
-    def get_hyper_index(self, index: int = None, page_size: int = 10) -> dict:
-        """Return a deletion-resilient page and the next index to continue from."""
-        if index is None:
-            index = 0
+    def get_hyper_index(self, index: int = None, page_size: int = 10) -> Dict:
+        """Return dict of pagination data.
 
-        assert isinstance(index, int) and index >= 0
-        original_len = len(self.dataset())
-        assert index < original_len
+        Args:
+            index (int, optional): index. Defaults to None.
+            page_size (int, optional): size of page. Defaults to 10.
 
-        indexed = self.indexed_dataset()
-        data_page = []
-        i = index
-        collected = 0
+        Returns:
+            Dict: indexed data
+        """
+        len_data = len(self.dataset())
+        assert 1 < index < len_data
 
-        while collected < page_size and i < original_len:
-            row = indexed.get(i)
-            if row is not None:
-                data_page.append(row)
-                collected += 1
-            i += 1
-
-        return {
-            "index": index,
-            "data": data_page,
-            "page_size": len(data_page),
-            "next_index": i
+        indexed_dataset = self.indexed_dataset()
+        indexed_pages = {}
+        for i in range(index, len_data):
+            if i in indexed_dataset and len(indexed_pages) < page_size:
+                indexed_pages[i] = indexed_dataset[i]
+        pages = list(indexed_pages.values())
+        idx = indexed_pages.keys()
+        indexed_data = {
+            'index': index,
+            'data': pages,
+            'page_size': len(pages),
+            'next_index': max(idx) + 1
         }
+        return indexed_data
